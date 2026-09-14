@@ -7,15 +7,56 @@
         body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #121212; color: white; }
         .card { background: #1e1e1e; padding: 2rem; border-radius: 12px; text-align: center; }
         .btn-vk { background: #0077ff; color: white; padding: 12px 24px; border: none; border-radius: 6px; text-decoration: none; font-weight: bold; display: inline-block; margin-top: 15px; }
-    </style>
-	<script nonce="csp_nonce" src="https://unpkg.com/@vkid/sdk@<3.0.0/dist-sdk/umd/index.js"></script>
+	.adblock-warning {
+      display: none;
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: #ff4d4f;
+      color: white;
+      padding: 16px 24px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      z-index: 9999;
+      font-family: system-ui, -apple-system, sans-serif;
+      text-align: center;
+      max-width: 450px;
+    }
+    .adblock-warning strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 16px;
+    }
+	</style>
+	<script nonce="csp_nonce" src="https://unpkg.com/@vkid/sdk@<3.0.0/dist-sdk/umd/index.js" onerror="handleVkIdLoadError()" onload="handleVkIdSuccess()"></script>
 </head>
 <body>
+
     <div class="card">
         <h1>ARAQUM ID</h1>
         <p>Выберите способ входа:</p>
 		<div>
-  
+  <div id="adblock-banner" class="adblock-warning">
+    <strong>Блокировщик рекламы мешает входу!</strong>
+    Пожалуйста, отключите AdBlock, uBlock или AdGuard для этого сайта, чтобы авторизация через VK ID работала корректно.
+  </div>
+  <script>
+    function handleVkIdLoadError() {
+      console.error('VK ID SDK заблокирован браузером или расширением.');
+      
+      // Показываем плашку с предупреждением
+      const banner = document.getElementById('adblock-banner');
+      if (banner) {
+        banner.style.display = 'block';
+      }
+    }
+
+    function handleVkIdSuccess() {
+      console.log('VK ID SDK успешно загружен');
+      // Здесь ваша инициализация VK ID SDK
+    }
+  </script>
   <script nonce="csp_nonce" type="text/javascript">
     if ('VKIDSDK' in window) {
       const VKID = window.VKIDSDK;
