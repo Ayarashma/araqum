@@ -11,6 +11,15 @@ from pydantic import BaseModel
 
 app = FastAPI(title="ARAQUM ID Auth")
 
+# Список разрешенных доменов экосистемы
+ORIGINS = [
+    CORSMiddleware,
+    allow_origins=ORIGINS,  # Указываем конкретный список вместо "*"
+    allow_credentials=True, # Браузер теперь пропустит credentials: 'include'
+    allow_methods=["*"],
+    allow_headers=["*"],
+]
+
 # Настройка CORS
 app.add_middleware(
     CORSMiddleware,
