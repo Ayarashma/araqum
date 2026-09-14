@@ -29,7 +29,6 @@
       font-size: 16px;
     }
 	</style>
-	<script nonce="csp_nonce" src="https://unpkg.com/@vkid/sdk@<3.0.0/dist-sdk/umd/index.js" onerror="handleVkIdLoadError()" onload="handleVkIdSuccess()"></script>
 </head>
 <body>
 
@@ -41,6 +40,7 @@
     <strong>Блокировщик рекламы мешает входу!</strong>
     Пожалуйста, отключите AdBlock, uBlock или AdGuard для этого сайта, чтобы авторизация через VK ID работала корректно.
   </div>
+  <script nonce="csp_nonce" src="https://unpkg.com/@vkid/sdk@<3.0.0/dist-sdk/umd/index.js" onerror="handleVkIdLoadError()" onload="handleVkIdSuccess()"></script>
   <script>
     function handleVkIdLoadError() {
       console.error('VK ID SDK заблокирован браузером или расширением.');
