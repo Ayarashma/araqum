@@ -68,7 +68,7 @@
         redirectUrl: 'https://id.araqum.ru/api/v1/auth/oauth/vk/callback',
         responseMode: VKID.ConfigResponseMode.Callback,
         source: VKID.ConfigSource.LOWCODE,
-        scope: '', // Заполните нужными доступами по необходимости
+        scope: '',
       });
 
       const oneTap = new VKID.OneTap();
@@ -86,36 +86,32 @@
         const code = payload.code;
         const deviceId = payload.device_id;
 
-        VKID.Auth.exchangeCode(code, deviceId)
-          .then(vkidOnSuccess)
-          .catch(vkidOnError);
+        // Отправка кода на id.araqum.com
+        fetch('https://id.araqum.com/api/v1/auth/exchange', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ code: code, deviceId: deviceId })
+        })
+        .then(res => {
+          if (!res.ok) throw new Error('Auth error');
+          return res.json();
+        })
+        .then(() => {
+          // Редиректим авторизованного пользователя на id.araqum.com
+          window.location.href = 'https://id.araqum.com';
+        })
+        .catch(vkidOnError);
       });
-    
+
       function vkidOnSuccess(data) {
-        // Обработка полученного результата
+        // Дополнительная обработка
       }
-    
+
       function vkidOnError(error) {
-        // Обработка ошибки
+        console.error('VK ID Error:', error);
       }
     }
-	.on(VKID.OneTapInternalEvents.LOGIN_SUCCESS, function (payload) {
-  fetch('https://id.araqum.com/api/v1/auth/exchange', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ code: payload.code })
-  })
-  .then(res => {
-    if (!res.ok) throw new Error('Ошибка авторизации');
-    return res.json();
-  })
-  .then(() => {
-    // Явный редирект пользователя обратно на id.araqum.com
-    window.location.href = 'https://id.araqum.com';
-  })
-  .catch(err => console.error('Ошибка входа:', err));
-});
   </script>
 </div>
         <!--a href="https://id.araqum.ru/api/v1/auth/oauth/vk/login" class="btn-vk">Войти через VK ID</a//-->
