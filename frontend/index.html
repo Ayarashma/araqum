@@ -2,6 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
+	<link rel="icon" href="data:,">
     <title>ARAQUM ID</title>
     <style>
         body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #121212; color: white; }
@@ -40,7 +41,6 @@
     <strong>Блокировщик рекламы мешает входу!</strong>
     Пожалуйста, отключите AdBlock, uBlock или AdGuard для этого сайта, чтобы авторизация через VK ID работала корректно.
   </div>
-  <script nonce="csp_nonce" src="https://unpkg.com/@vkid/sdk@<3.0.0/dist-sdk/umd/index.js" onerror="handleVkIdLoadError()" onload="handleVkIdSuccess()"></script>
   <script>
     function handleVkIdLoadError() {
       console.error('VK ID SDK заблокирован браузером или расширением.');
@@ -57,6 +57,7 @@
       // Здесь ваша инициализация VK ID SDK
     }
   </script>
+  <script nonce="csp_nonce" src="https://unpkg.com/@vkid/sdk@<3.0.0/dist-sdk/umd/index.js" onerror="handleVkIdLoadError()" onload="handleVkIdSuccess()"></script>
   <script nonce="csp_nonce" type="text/javascript">
     if ('VKIDSDK' in window) {
       const VKID = window.VKIDSDK;
