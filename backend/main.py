@@ -46,7 +46,10 @@ async def get_db():
 
 class VerifyCodeRequest(BaseModel):
     code: str
-    device_id: str | None = None
+    device_id: str | None = Field(None, alias="deviceId")
+
+    class Config:
+        populate_by_name = True
 
 @app.get("/api/v1/auth/oauth/vk/login")
 async def vk_login():
@@ -119,29 +122,23 @@ async def vk_callback(code: str):
 # 6. Эндпоинт ДЛЯ C# БЭКЕНДА: обмен одноразового кода на профиль и JWT
 @app.post("/api/v1/auth/verify-code")
 async def verify_code(payload: VerifyCodeRequest):
-    # 1. Проверяем старый внутренний OAuth (если был редирект)
-    data = AUTH_CODES.pop(payload.code, None)
-    
-    # 2. Если в локальной памяти кода нет — это прямой VK ID OneTap code
-    if not data:
-        async with httpx.AsyncClient() as client:
-            vk_payload = {
-                "grant_type": "authorization_code",
-                "client_id": VK_CLIENT_ID,         # 54769644
-                "client_secret": VK_CLIENT_SECRET, # Защищенный ключ из VK ID
-                "redirect_uri": "https://araqum.ru",
-                "code": payload.code,
-                "device_id": payload.device_id or ""
-            }
-            
-            # Запрос обмена кода в VK API
-            vk_res = await client.post("https://id.vk.com/oauth2/auth", data=vk_payload)
-            vk_data = vk_res.json()
-            
-            # Если отдал ошибку — выводим детали в консоль FastAPI для отладки
-            if "access_token" not in vk_data:
-                print(f"[VK API ERROR] Status: {vk_res.status_code} | Body: {vk_data}", flush=True)
-                raise HTTPException(status_code=401, detail=f"VK Exchange Failed: {vk_data.get('error_description', 'Invalid Code')}")
+    async with httpx.AsyncClient() as client:
+        vk_payload = {
+            "grant_type": "authorization_code",
+            "client_id": "54769644",
+            "client_secret": VK_CLIENT_SECRET,  # Защищенный ключ из кабинета VK
+            "redirect_uri": "https://araqum.ru",
+            "code": payload.code,
+            "device_id": payload.device_id or ""
+        }
+        
+        # Обмен авторизационного кода VK ID v2
+        vk_res = await client.post("https://id.vk.com/oauth2/auth", data=vk_payload)
+        vk_data = vk_res.json()
+        
+        if "access_token" not in vk_data:
+            print(f"[VK ERROR] {vk_data}", flush=True)
+            raise HTTPException(status_code=401, detail=vk_data)
             
             # Извлекаем данные пользователя из ответа VK
             user_info = vk_data.get("user", {})
