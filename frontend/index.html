@@ -65,7 +65,8 @@
 
     VKID.Config.init({
       app: 54769644,
-      redirectUrl: 'https://araqum.ru', // Указываем текущий домен для Callback
+      // Этот URL должен быть СТРОГО прописан в "Доверительный Redirect URI" в кабинете VK:
+      redirectUrl: 'https://araqum.ru', 
       responseMode: VKID.ConfigResponseMode.Callback,
       scope: '',
     });
@@ -85,7 +86,7 @@
       const code = payload.code;
       const deviceId = payload.device_id;
 
-      // Отображаем сообщение пользователю
+      // Визуальный отклик для пользователя на araqum.ru
       const container = document.getElementById('vkid-container') || document.currentScript.parentElement;
       container.innerHTML = `
         <div style="text-align: center; font-family: sans-serif; padding: 20px;">
@@ -95,7 +96,7 @@
         </div>
       `;
 
-      // Отправка кода на C# бэкенд
+      // Данные междоменно уходят на .com бэкенд для записи Cookies
       fetch('https://id.araqum.com/api/v1/auth/exchange', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -107,6 +108,7 @@
         return res.json();
       })
       .then(() => {
+        // Редирект пользователя на id.araqum.com
         window.location.href = 'https://id.araqum.com';
       })
       .catch(error => {
