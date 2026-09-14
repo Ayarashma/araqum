@@ -59,68 +59,68 @@
     }
   </script>
   <script nonce="csp_nonce" src="https://unpkg.com/@vkid/sdk@<3.0.0/dist-sdk/umd/index.js" onerror="handleVkIdLoadError()" onload="handleVkIdSuccess()"></script>
-  <script nonce="csp_nonce" type="text/javascript">
-  if ('VKIDSDK' in window) {
-    const VKID = window.VKIDSDK;
+  <!-- Явный контейнер в HTML -->
+<div id="vkid-container"></div>
 
-    VKID.Config.init({
-      app: 54769644,
-      // Этот URL должен быть СТРОГО прописан в "Доверительный Redirect URI" в кабинете VK:
-      redirectUrl: 'https://araqum.ru', 
-      responseMode: VKID.ConfigResponseMode.Callback,
-      scope: '',
-    });
+<script nonce="csp_nonce" type="text/javascript">
+  document.addEventListener('DOMContentLoaded', function () {
+    if ('VKIDSDK' in window) {
+      const VKID = window.VKIDSDK;
 
-    const oneTap = new VKID.OneTap();
-
-    oneTap.render({
-      container: document.currentScript.parentElement,
-      showAlternativeLogin: true,
-      oauthList: [
-        'mail_ru',
-        'ok_ru'
-      ]
-    })
-    .on(VKID.WidgetEvents.ERROR, vkidOnError)
-    .on(VKID.OneTapInternalEvents.LOGIN_SUCCESS, function (payload) {
-      const code = payload.code;
-      const deviceId = payload.device_id;
-
-      // Визуальный отклик для пользователя на araqum.ru
-      const container = document.getElementById('vkid-container') || document.currentScript.parentElement;
-      container.innerHTML = `
-        <div style="text-align: center; font-family: sans-serif; padding: 20px;">
-          <p style="color: #4bb34b; font-weight: bold; margin-bottom: 8px;">✓ Успешно авторизованы!</p>
-          <p style="color: #666; font-size: 14px; margin-bottom: 12px;">Перенаправление в личный кабинет...</p>
-          <a href="https://id.araqum.com" style="display: inline-block; padding: 8px 16px; background: #0077ff; color: #fff; text-decoration: none; border-radius: 8px; font-size: 14px;">Перейти вручную</a>
-        </div>
-      `;
-
-      // Данные междоменно уходят на .com бэкенд для записи Cookies
-      fetch('https://id.araqum.com/api/v1/auth/exchange', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ code: code, deviceId: deviceId })
-      })
-      .then(res => {
-        if (!res.ok) throw new Error('Auth error');
-        return res.json();
-      })
-      .then(() => {
-        // Редирект пользователя на id.araqum.com
-        window.location.href = 'https://id.araqum.com';
-      })
-      .catch(error => {
-        console.error('Exchange Error:', error);
-        container.innerHTML = `<p style="color: #e64646;">Ошибка авторизации. Попробуйте обновить страницу.</p>`;
+      VKID.Config.init({
+        app: 54769644,
+        redirectUrl: 'https://araqum.ru',
+        responseMode: VKID.ConfigResponseMode.Callback
       });
-    });
 
-    function vkidOnError(error) {
-      console.error('VK ID Error Details:', error);
+      const oneTap = new VKID.OneTap();
+
+      oneTap.render({
+        container: document.getElementById('vkid-container'), // Явный элемент
+        showAlternativeLogin: true,
+        oauthList: [
+          'mail_ru',
+          'ok_ru'
+        ]
+      })
+      .on(VKID.WidgetEvents.ERROR, vkidOnError)
+      .on(VKID.OneTapInternalEvents.LOGIN_SUCCESS, function (payload) {
+        const code = payload.code;
+        const deviceId = payload.device_id;
+
+        const container = document.getElementById('vkid-container');
+        container.innerHTML = `
+          <div style="text-align: center; font-family: sans-serif; padding: 20px;">
+            <p style="color: #4bb34b; font-weight: bold; margin-bottom: 8px;">✓ Успешно авторизованы!</p>
+            <p style="color: #666; font-size: 14px; margin-bottom: 12px;">Перенаправление в личный кабинет...</p>
+            <a href="https://id.araqum.com" style="display: inline-block; padding: 8px 16px; background: #0077ff; color: #fff; text-decoration: none; border-radius: 8px; font-size: 14px;">Перейти вручную</a>
+          </div>
+        `;
+
+        fetch('https://id.araqum.com/api/v1/auth/exchange', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ code: code, deviceId: deviceId })
+        })
+        .then(res => {
+          if (!res.ok) throw new Error('Auth error');
+          return res.json();
+        })
+        .then(() => {
+          window.location.href = 'https://id.araqum.com';
+        })
+        .catch(error => {
+          console.error('Exchange Error:', error);
+          container.innerHTML = `<p style="color: #e64646;">Ошибка авторизации. Попробуйте обновить страницу.</p>`;
+        });
+      });
+
+      function vkidOnError(error) {
+        console.error('VK ID Error Details:', error);
+      }
     }
-  }
+  });
 </script>
 </div>
         <!--a href="https://id.araqum.ru/api/v1/auth/oauth/vk/login" class="btn-vk">Войти через VK ID</a//-->
