@@ -46,6 +46,7 @@ async def get_db():
 
 class VerifyCodeRequest(BaseModel):
     code: str
+    device_id: str | None = None
 
 @app.get("/api/v1/auth/oauth/vk/login")
 async def vk_login():
@@ -118,18 +119,47 @@ async def vk_callback(code: str):
 # 6. Эндпоинт ДЛЯ C# БЭКЕНДА: обмен одноразового кода на профиль и JWT
 @app.post("/api/v1/auth/verify-code")
 async def verify_code(payload: VerifyCodeRequest):
-    data = AUTH_CODES.pop(payload.code, None) # Код сразу удаляется после 1 использования
+    # 1. Сначала проверяем, есть ли код во внутреннем словаре (для старого Flow)
+    data = AUTH_CODES.pop(payload.code, None)
     
-    if not data or data["expires_at"] < datetime.now(timezone.utc):
-        raise HTTPException(status_code=400, detail="Код недействителен или истек")
+    # 2. Если во внутреннем словаре кода нет — значит это VK ID OneTap code!
+    if not data:
+        async with httpx.AsyncClient() as client:
+            vk_res = await client.post(
+                "https://api.vk.ru/oauth2/auth",
+                data={
+                    "grant_type": "authorization_code",
+                    "client_id": VK_CLIENT_ID,
+                    "client_secret": VK_CLIENT_SECRET,
+                    "redirect_uri": "https://araqum.ru", # Должен совпадать с VKID.Config.init
+                    "code": payload.code,
+                    "device_id": payload.device_id or "",
+                }
+            )
+            
+            vk_data = vk_res.json()
+            
+            if "access_token" not in vk_data:
+                raise HTTPException(status_code=400, detail="Код VK недействителен или истек")
+            
+            # Получаем или создаем пользователя в БД FastAPI по vk_data["user_id"]
+            # user = await get_or_create_user(vk_data)
+            
+            data = {
+                "user_id": vk_data.get("user_id"),
+                "first_name": vk_data.get("user", {}).get("first_name", ""),
+                "last_name": vk_data.get("user", {}).get("last_name", ""),
+                "avatar": vk_data.get("user", {}).get("avatar", ""),
+                "vk_link": f"https://vk.com/id{vk_data.get('user_id')}"
+            }
 
-    # Упаковываем JWT для C# сервера
+    # 3. Генерируем JWT для C# (.NET)
     jwt_payload = {
         "sub": str(data["user_id"]),
-        "first_name": data["first_name"],
-        "last_name": data["last_name"],
-        "avatar": data["avatar"],
-        "vk_link": data["vk_link"],
+        "first_name": data.get("first_name"),
+        "last_name": data.get("last_name"),
+        "avatar": data.get("avatar"),
+        "vk_link": data.get("vk_link"),
         "exp": datetime.now(timezone.utc) + timedelta(days=7)
     }
     
