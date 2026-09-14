@@ -68,10 +68,11 @@
       const VKID = window.VKIDSDK;
 
       VKID.Config.init({
-        app: 54769644,
-        redirectUrl: 'https://araqum.ru',
-        responseMode: VKID.ConfigResponseMode.Callback
-      });
+  app: 54769644,
+  redirectUrl: 'https://araqum.ru',
+  responseMode: VKID.ConfigResponseMode.Callback,
+  source: VKID.ConfigSource.Popup // ← ДОБАВЬ ТОЛЬКО ЭТУ СТРОЧКУ
+});
 
       const oneTap = new VKID.OneTap();
 
