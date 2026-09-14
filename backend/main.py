@@ -119,41 +119,41 @@ async def vk_callback(code: str):
 # 6. Эндпоинт ДЛЯ C# БЭКЕНДА: обмен одноразового кода на профиль и JWT
 @app.post("/api/v1/auth/verify-code")
 async def verify_code(payload: VerifyCodeRequest):
-    # 1. Сначала проверяем, есть ли код во внутреннем словаре (для старого Flow)
+    # 1. Проверяем старый внутренний OAuth (если был редирект)
     data = AUTH_CODES.pop(payload.code, None)
     
-    # 2. Если во внутреннем словаре кода нет — значит это VK ID OneTap code!
+    # 2. Если в локальной памяти кода нет — это прямой VK ID OneTap code
     if not data:
         async with httpx.AsyncClient() as client:
-            vk_res = await client.post(
-                "https://api.vk.ru/oauth2/auth",
-                data={
-                    "grant_type": "authorization_code",
-                    "client_id": VK_CLIENT_ID,
-                    "client_secret": VK_CLIENT_SECRET,
-                    "redirect_uri": "https://araqum.ru", # Должен совпадать с VKID.Config.init
-                    "code": payload.code,
-                    "device_id": payload.device_id or "",
-                }
-            )
+            vk_payload = {
+                "grant_type": "authorization_code",
+                "client_id": VK_CLIENT_ID,         # 54769644
+                "client_secret": VK_CLIENT_SECRET, # Защищенный ключ из VK ID
+                "redirect_uri": "https://araqum.ru",
+                "code": payload.code,
+                "device_id": payload.device_id or ""
+            }
             
+            # Запрос обмена кода в VK API
+            vk_res = await client.post("https://id.vk.com/oauth2/auth", data=vk_payload)
             vk_data = vk_res.json()
             
+            # Если отдал ошибку — выводим детали в консоль FastAPI для отладки
             if "access_token" not in vk_data:
-                raise HTTPException(status_code=400, detail="Код VK недействителен или истек")
+                print(f"[VK API ERROR] Status: {vk_res.status_code} | Body: {vk_data}", flush=True)
+                raise HTTPException(status_code=401, detail=f"VK Exchange Failed: {vk_data.get('error_description', 'Invalid Code')}")
             
-            # Получаем или создаем пользователя в БД FastAPI по vk_data["user_id"]
-            # user = await get_or_create_user(vk_data)
-            
+            # Извлекаем данные пользователя из ответа VK
+            user_info = vk_data.get("user", {})
             data = {
-                "user_id": vk_data.get("user_id"),
-                "first_name": vk_data.get("user", {}).get("first_name", ""),
-                "last_name": vk_data.get("user", {}).get("last_name", ""),
-                "avatar": vk_data.get("user", {}).get("avatar", ""),
+                "user_id": vk_data.get("user_id") or user_info.get("id"),
+                "first_name": user_info.get("first_name", ""),
+                "last_name": user_info.get("last_name", ""),
+                "avatar": user_info.get("avatar", ""),
                 "vk_link": f"https://vk.com/id{vk_data.get('user_id')}"
             }
 
-    # 3. Генерируем JWT для C# (.NET)
+    # 3. Генерируем JWT для .NET (id.araqum.com)
     jwt_payload = {
         "sub": str(data["user_id"]),
         "first_name": data.get("first_name"),
