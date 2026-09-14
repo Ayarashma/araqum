@@ -42,86 +42,73 @@
     <strong>Блокировщик рекламы мешает входу!</strong>
     Пожалуйста, отключите AdBlock, uBlock или AdGuard для этого сайта, чтобы авторизация через VK ID работала корректно.
   </div>
-  <script>
-    function handleVkIdLoadError() {
-      console.error('VK ID SDK заблокирован браузером или расширением.');
-      
-      // Показываем плашку с предупреждением
-      const banner = document.getElementById('adblock-banner');
-      if (banner) {
-        banner.style.display = 'block';
-      }
-    }
 
-    function handleVkIdSuccess() {
-      console.log('VK ID SDK успешно загружен');
-      // Здесь ваша инициализация VK ID SDK
-    }
-  </script>
   <script nonce="csp_nonce" src="https://unpkg.com/@vkid/sdk@<3.0.0/dist-sdk/umd/index.js" onerror="handleVkIdLoadError()" onload="handleVkIdSuccess()"></script>
   <!-- Явный контейнер в HTML -->
 <div id="vkid-container"></div>
 
-<script nonce="csp_nonce" type="text/javascript">
-  document.addEventListener('DOMContentLoaded', function () {
-    if ('VKIDSDK' in window) {
-      const VKID = window.VKIDSDK;
-
-      VKID.Config.init({
-  app: 54769644,
-  redirectUrl: 'https://araqum.ru',
-  responseMode: VKID.ConfigResponseMode.Callback,
-  source: VKID.ConfigSource.Popup // ← ДОБАВЬ ТОЛЬКО ЭТУ СТРОЧКУ
-});
-
-      const oneTap = new VKID.OneTap();
-
-      oneTap.render({
-        container: document.getElementById('vkid-container'), // Явный элемент
-        showAlternativeLogin: true,
-        oauthList: [
-          'mail_ru',
-          'ok_ru'
-        ]
-      })
-      .on(VKID.WidgetEvents.ERROR, vkidOnError)
-      .on(VKID.OneTapInternalEvents.LOGIN_SUCCESS, function (payload) {
-  const code = payload.code;
-  const deviceId = payload.device_id || payload.deviceId || ''; // Захватываем device_id
-
-  const container = document.getElementById('vkid-container');
-  container.innerHTML = `
-    <div style="text-align: center; font-family: sans-serif; padding: 20px;">
-      <p style="color: #4bb34b; font-weight: bold; margin-bottom: 8px;">✓ Успешно авторизованы!</p>
-      <p style="color: #666; font-size: 14px; margin-bottom: 12px;">Перенаправление...</p>
-    </div>
-  `;
-
-  fetch('https://id.araqum.com/api/v1/auth/exchange', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ code: code, deviceId: deviceId }) // Обязательно передаем deviceId
-  })
-  .then(res => {
-    if (!res.ok) throw new Error('Auth error');
-    return res.json();
-  })
-  .then(() => {
-    window.location.href = 'https://id.araqum.com';
-  })
-  .catch(error => {
-    console.error('Exchange Error:', error);
-    container.innerHTML = `<p style="color: #e64646;">Ошибка авторизации. Обновите страницу.</p>`;
-  });
-});
-
-      function vkidOnError(error) {
-        console.error('VK ID Error Details:', error);
-      }
+<script>
+        function handleVkIdLoadError() {
+            const banner = document.getElementById('adblock-banner');
+			console.error('VK ID SDK заблокирован браузером или расширением.');
+            if (banner) banner.style.display = 'block';
+        }
+function handleVkIdSuccess() {
+      console.log('VK ID SDK успешно загружен');
+      // Здесь ваша инициализация VK ID SDK
     }
-  });
-</script>
+        document.addEventListener('DOMContentLoaded', function () {
+            if ('VKIDSDK' in window) {
+                const VKID = window.VKIDSDK;
+
+                VKID.Config.init({
+                    app: 54769644,
+                    redirectUrl: 'https://araqum.ru',
+                    responseMode: VKID.ConfigResponseMode.Callback,
+                    source: VKID.ConfigSource.Popup
+                });
+
+                const oneTap = new VKID.OneTap();
+
+                oneTap.render({
+                    container: document.getElementById('vkid-container'),
+                    showAlternativeLogin: true,
+                    oauthList: [
+                        'mail_ru',
+                        'ok_ru'
+                    ]
+                })
+                .on(VKID.WidgetEvents.ERROR, function(err) {
+                    console.error('VK ID Error:', err);
+                })
+                .on(VKID.OneTapInternalEvents.LOGIN_SUCCESS, function (payload) {
+                    const code = payload.code;
+                    const deviceId = payload.device_id || payload.deviceId || '';
+
+                    const container = document.getElementById('vkid-container');
+                    container.innerHTML = `<p style="color: #4bb34b;">✓ Авторизация прошла, перенаправляем...</p>`;
+
+                    fetch('https://id.araqum.com/api/v1/auth/exchange', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({ code: code, deviceId: deviceId })
+                    })
+                    .then(res => {
+                        if (!res.ok) throw new Error('Auth error');
+                        return res.json();
+                    })
+                    .then(() => {
+                        window.location.href = 'https://id.araqum.com';
+                    })
+                    .catch(error => {
+                        console.error('Exchange Error:', error);
+                        container.innerHTML = `<p style="color: #e64646;">Ошибка входа. Попробуйте обновить страницу.</p>`;
+                    });
+                });
+            }
+        });
+    </script>
 </div>
         <!--a href="https://id.araqum.ru/api/v1/auth/oauth/vk/login" class="btn-vk">Войти через VK ID</a//-->
     </div>

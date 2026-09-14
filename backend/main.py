@@ -7,23 +7,21 @@ import asyncpg
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 app = FastAPI(title="ARAQUM ID Auth")
 
-# Список разрешенных доменов экосистемы
+# Разрешенные домены экосистемы
 ORIGINS = [
-    CORSMiddleware,
-    allow_origins=ORIGINS,  # Указываем конкретный список вместо "*"
-    allow_credentials=True, # Браузер теперь пропустит credentials: 'include'
-    allow_methods=["*"],
-    allow_headers=["*"],
+    "https://araqum.ru",
+    "https://id.araqum.com",
+    "https://id.araqum.ru"
 ]
 
-# Настройка CORS
+# Настройка CORS Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -31,14 +29,13 @@ app.add_middleware(
 
 # Переменные окружения из .env
 DATABASE_URL = os.getenv("ConnectionStrings__Postgres")
-VK_CLIENT_ID = os.getenv("VK_CLIENT_ID")
+VK_CLIENT_ID = os.getenv("VK_CLIENT_ID", "54769644")
 VK_CLIENT_SECRET = os.getenv("VK_CLIENT_SECRET")
 VK_REDIRECT_URI = os.getenv("VK_REDIRECT_URI", "https://id.araqum.ru/api/v1/auth/oauth/vk/callback")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "https://id.araqum.com")
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "fK42JFVRIVfV452B525mnjbvBS5FFgfbnnSS452KHGD426GBfH25QbfgbJDHJLKD5JYUbgfDSFJnVSKJFHB4VG639FfbfVGMnb")
 
-
-# Временное хранилище одноразовых кодов (в продакшене лучше Redis, для старта подойдет словарь)
+# Временное хранилище кодов
 AUTH_CODES = {}
 
 async def get_db():
@@ -54,7 +51,7 @@ class VerifyCodeRequest(BaseModel):
 @app.get("/api/v1/auth/oauth/vk/login")
 async def vk_login():
     url = (
-        f"https://id.vk.ru/authorize?"
+        f"https://id.vk.com/authorize?"
         f"response_type=code&client_id={VK_CLIENT_ID}"
         f"&redirect_uri={VK_REDIRECT_URI}"
     )
@@ -63,9 +60,8 @@ async def vk_login():
 @app.get("/api/v1/auth/oauth/vk/callback")
 async def vk_callback(code: str):
     async with httpx.AsyncClient() as client:
-        # 1. Получаем токен от VK
         token_response = await client.post(
-            "https://api.vk.ru/oauth2/auth",
+            "https://id.vk.com/oauth2/auth",
             data={
                 "grant_type": "authorization_code",
                 "client_id": VK_CLIENT_ID,
@@ -81,9 +77,8 @@ async def vk_callback(code: str):
         access_token = token_data["access_token"]
         user_id_vk = str(token_data.get("user_id"))
 
-        # 2. Получаем профиль VK
         user_response = await client.get(
-            "https://api.vk.ru/method/users.get",
+            "https://api.vk.com/method/users.get",
             params={
                 "user_ids": user_id_vk,
                 "fields": "photo_200,domain",
@@ -93,7 +88,6 @@ async def vk_callback(code: str):
         )
         user_info = user_response.json().get("response", [{}])[0]
 
-    # 3. База данных
     conn = await get_db()
     try:
         user = await conn.fetchrow("SELECT id FROM users WHERE vk_id = $1", user_id_vk)
@@ -103,7 +97,6 @@ async def vk_callback(code: str):
     finally:
         await conn.close()
 
-    # 4. Генерируем одноразовый временный код (живет 60 секунд)
     one_time_code = str(uuid.uuid4())
     AUTH_CODES[one_time_code] = {
         "user_id": db_user_id,
@@ -115,42 +108,41 @@ async def vk_callback(code: str):
         "expires_at": datetime.now(timezone.utc) + timedelta(seconds=60)
     }
 
-    # 5. Возвращаем пользователя на .com ТОЛЬКО с одноразовым кодом
     return RedirectResponse(f"{FRONTEND_URL}/auth/callback?code={one_time_code}")
 
 
-# 6. Эндпоинт ДЛЯ C# БЭКЕНДА: обмен одноразового кода на профиль и JWT
+# Эндпоинт обмена кода для C# .NET API
 @app.post("/api/v1/auth/verify-code")
 async def verify_code(payload: VerifyCodeRequest):
     async with httpx.AsyncClient() as client:
         vk_payload = {
             "grant_type": "authorization_code",
-            "client_id": "54769644",
-            "client_secret": VK_CLIENT_SECRET,  # Защищенный ключ из кабинета VK
+            "client_id": VK_CLIENT_ID,
+            "client_secret": VK_CLIENT_SECRET,
             "redirect_uri": "https://araqum.ru",
             "code": payload.code,
             "device_id": payload.device_id or ""
         }
         
-        # Обмен авторизационного кода VK ID v2
         vk_res = await client.post("https://id.vk.com/oauth2/auth", data=vk_payload)
         vk_data = vk_res.json()
         
         if "access_token" not in vk_data:
-            print(f"[VK ERROR] {vk_data}", flush=True)
+            print(f"[VK ERROR] Status: {vk_res.status_code}, Body: {vk_data}", flush=True)
             raise HTTPException(status_code=401, detail=vk_data)
-            
-            # Извлекаем данные пользователя из ответа VK
-            user_info = vk_data.get("user", {})
-            data = {
-                "user_id": vk_data.get("user_id") or user_info.get("id"),
-                "first_name": user_info.get("first_name", ""),
-                "last_name": user_info.get("last_name", ""),
-                "avatar": user_info.get("avatar", ""),
-                "vk_link": f"https://vk.com/id{vk_data.get('user_id')}"
-            }
 
-    # 3. Генерируем JWT для .NET (id.araqum.com)
+        # Вынесено из блока if (теперь выполняется при успехе)
+        user_info = vk_data.get("user", {})
+        user_id = vk_data.get("user_id") or user_info.get("id")
+        
+        data = {
+            "user_id": user_id,
+            "first_name": user_info.get("first_name", ""),
+            "last_name": user_info.get("last_name", ""),
+            "avatar": user_info.get("avatar", ""),
+            "vk_link": f"https://vk.com/id{user_id}"
+        }
+
     jwt_payload = {
         "sub": str(data["user_id"]),
         "first_name": data.get("first_name"),
